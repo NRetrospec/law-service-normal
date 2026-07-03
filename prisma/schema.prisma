@@ -1,0 +1,362 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password      String?
+  firstName     String
+  lastName      String
+  phone         String?
+  role          Role     @default(CLIENT)
+  avatar        String?
+  isActive      Boolean  @default(true)
+  clerkId       String?  @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  clientProfile ClientProfile?
+  adminProfile  AdminProfile?
+  appointments  Appointment[]
+  messages      Message[]
+  documents     Document[]
+  payments      Payment[]
+  notifications Notification[]
+  blogPosts     BlogPost[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model ClientProfile {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address           String?
+  city              String?
+  state             String?
+  zipCode           String?
+  dateOfBirth       DateTime?
+  emergencyContact  String?
+  emergencyPhone    String?
+  referralSource    String?
+  caseType          String?
+  notes             String?
+  intakeFormData    Json?
+  
+  @@map("client_profiles")
+}
+
+model AdminProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String?
+  bio             String?
+  education       String[]
+  barAdmissions   String[]
+  certifications  String[]
+  awards          String[]
+  yearsExperience Int?
+  specialties     String[]
+  
+  @@map("admin_profiles")
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  clientId        String
+  client          User              @relation(fields: [clientId], references: [id])
+  date            DateTime
+  duration        Int               @default(60)
+  type            AppointmentType
+  status          AppointmentStatus @default(PENDING)
+  meetingLink     String?
+  notes           String?
+  intakeCompleted Boolean           @default(false)
+  depositPaid     Boolean           @default(false)
+  depositAmount   Decimal?          @db.Decimal(10, 2)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@map("appointments")
+}
+
+model Case {
+  id            String     @id @default(uuid())
+  caseNumber    String     @unique
+  clientId      String
+  title         String
+  description   String?
+  practiceArea  String
+  status        CaseStatus @default(ACTIVE)
+  value         Decimal?   @db.Decimal(12, 2)
+  outcome       String?
+  startDate     DateTime   @default(now())
+  endDate       DateTime?
+  isFeatured    Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  documents     Document[]
+  notes         CaseNote[]
+  
+  @@map("cases")
+}
+
+model CaseNote {
+  id        String   @id @default(uuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  content   String
+  isPrivate Boolean  @default(false)
+  createdBy String
+  createdAt DateTime @default(now())
+
+  @@map("case_notes")
+}
+
+model PracticeArea {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  description String
+  content     String   @db.Text
+  icon        String?
+  image       String?
+  metaTitle   String?
+  metaDesc    String?
+  faqs        Json?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("practice_areas")
+}
+
+model BlogPost {
+  id           String   @id @default(uuid())
+  slug         String   @unique
+  title        String
+  excerpt      String
+  content      String   @db.Text
+  featuredImage String?
+  authorId     String
+  author       User     @relation(fields: [authorId], references: [id])
+  category     String
+  tags         String[]
+  status       PostStatus @default(DRAFT)
+  publishedAt  DateTime?
+  metaTitle    String?
+  metaDesc     String?
+  views        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("blog_posts")
+}
+
+model Testimonial {
+  id        String   @id @default(uuid())
+  name      String
+  role      String?
+  company   String?
+  content   String
+  rating    Int      @default(5)
+  image     String?
+  isVideo   Boolean  @default(false)
+  videoUrl  String?
+  isFeatured Boolean @default(false)
+  isActive  Boolean  @default(true)
+  caseType  String?
+  createdAt DateTime @default(now())
+
+  @@map("testimonials")
+}
+
+model Document {
+  id          String         @id @default(uuid())
+  name        String
+  fileUrl     String
+  fileType    String
+  fileSize    Int
+  category    DocumentCategory
+  uploadedBy  String
+  uploader    User           @relation(fields: [uploadedBy], references: [id])
+  caseId      String?
+  case        Case?          @relation(fields: [caseId], references: [id])
+  isPublic    Boolean        @default(false)
+  isTemplate  Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+
+  @@map("documents")
+}
+
+model Message {
+  id          String   @id @default(uuid())
+  senderId    String
+  sender      User     @relation(fields: [senderId], references: [id])
+  recipientId String?
+  subject     String
+  content     String
+  isRead      Boolean  @default(false)
+  isUrgent    Boolean  @default(false)
+  parentId    String?
+  createdAt   DateTime @default(now())
+
+  @@map("messages")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  clientId      String
+  client        User          @relation(fields: [clientId], references: [id])
+  amount        Decimal       @db.Decimal(10, 2)
+  description   String
+  status        PaymentStatus @default(PENDING)
+  stripeId      String?
+  invoiceUrl    String?
+  paidAt        DateTime?
+  dueDate       DateTime?
+  createdAt     DateTime      @default(now())
+
+  @@map("payments")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      NotificationType
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model IntakeForm {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  fields      Json
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  submissions IntakeSubmission[]
+  
+  @@map("intake_forms")
+}
+
+model IntakeSubmission {
+  id            String     @id @default(uuid())
+  formId        String
+  form          IntakeForm @relation(fields: [formId], references: [id])
+  data          Json
+  clientEmail   String
+  clientName    String
+  clientPhone   String?
+  appointmentId String?
+  createdAt     DateTime   @default(now())
+
+  @@map("intake_submissions")
+}
+
+model SiteSettings {
+  id              String   @id @default(uuid())
+  key             String   @unique
+  value           Json
+  updatedAt       DateTime @updatedAt
+
+  @@map("site_settings")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+enum Role {
+  CLIENT
+  ADMIN
+  ATTORNEY
+}
+
+enum AppointmentType {
+  CONSULTATION
+  FOLLOW_UP
+  CASE_REVIEW
+  DEPOSITION
+  MEDIATION
+  HEARING_PREP
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum CaseStatus {
+  ACTIVE
+  PENDING
+  CLOSED
+  SETTLED
+  WON
+  LOST
+  ON_HOLD
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum DocumentCategory {
+  CONTRACT
+  CORRESPONDENCE
+  COURT_FILING
+  EVIDENCE
+  INTAKE
+  INVOICE
+  LEGAL_OPINION
+  SETTLEMENT
+  TEMPLATE
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  REFUNDED
+  CANCELLED
+}
+
+enum NotificationType {
+  APPOINTMENT
+  MESSAGE
+  DOCUMENT
+  PAYMENT
+  CASE_UPDATE
+  SYSTEM
+}

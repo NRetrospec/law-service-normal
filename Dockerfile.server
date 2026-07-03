@@ -1,0 +1,28 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+RUN npm ci
+
+# Copy prisma schema
+COPY prisma ./prisma/
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy source code
+COPY server ./server
+COPY tsconfig.json ./
+
+# Build the server
+RUN npx tsc --project tsconfig.server.json || true
+
+# Create uploads directory
+RUN mkdir -p uploads
+
+EXPOSE 3001
+
+# Run migrations and start server
+CMD npx prisma migrate deploy && node server/dist/index.js

@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: lawfirm-db
+    environment:
+      POSTGRES_USER: lawfirm
+      POSTGRES_PASSWORD: lawfirm_password
+      POSTGRES_DB: lawfirm
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lawfirm -d lawfirm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: lawfirm-api
+    environment:
+      DATABASE_URL: postgresql://lawfirm:lawfirm_password@db:5432/lawfirm?schema=public
+      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      PORT: 3001
+      NODE_ENV: production
+      CLIENT_URL: http://localhost:5173
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      FROM_EMAIL: ${FROM_EMAIL}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+
+  # Frontend (served via nginx in production)
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lawfirm-web
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  uploads:
